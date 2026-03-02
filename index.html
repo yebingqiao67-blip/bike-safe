@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>單車安全守護者 - 隊長連線版</title>
+    <title>單車安全守護者 - 隊長全功能連線版</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
         #map { height: 100%; width: 100%; }
         .menu-btn { position: absolute; right: 15px; width: 50px; height: 50px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1000; border: none; }
+        #nav-btn { bottom: 230px; background: #2196F3; color: white; } /* 導航按鈕 */
         #locate-btn { bottom: 160px; }
         #report-btn { bottom: 90px; background: #ffeb3b; }
         #clear-btn { bottom: 20px; background: #ff5252; color: white; }
@@ -18,6 +19,7 @@
 <body>
 
 <div id="pts-display">隊長 Pts: <span id="pts-val">0</span></div>
+<button id="nav-btn" class="menu-btn">📍</button>
 <button id="locate-btn" class="menu-btn">🚀</button>
 <button id="report-btn" class="menu-btn">⚠️</button>
 <button id="clear-btn" class="menu-btn">🧹</button>
@@ -27,7 +29,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, push, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // 使用隊長提供的金鑰
     const firebaseConfig = {
       apiKey: "AIzaSyBFqXwgDg6vFh0doCw8xcU0Sv5hYAzDSHo",
       authDomain: "bike-safe-boss.firebaseapp.com",
@@ -48,14 +49,12 @@
     let userPos = null;
     let pts = 0;
 
-    // 監聽雲端資料，實現多人同步
     onChildAdded(obstaclesRef, (data) => {
         const pos = data.val();
         const marker = L.marker([pos.lat, pos.lng], {
             icon: L.divIcon({ html: '🚧', className: 'obs-icon', iconSize: [30, 30] })
         }).addTo(map);
 
-        // 隊長權限：點擊路障即可從雲端刪除
         marker.on('click', () => {
             if(confirm("隊長，要永久清除這個路障嗎？")){
                 remove(ref(db, `obstacles/${data.key}`));
@@ -63,6 +62,14 @@
             }
         });
     });
+
+    // 導航功能
+    document.getElementById('nav-btn').onclick = () => {
+        const dest = prompt("隊長，要去哪裡？(請輸入地點名稱)");
+        if (dest) {
+            window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}&travelmode=bicycling`, '_blank');
+        }
+    };
 
     document.getElementById('locate-btn').onclick = () => {
         map.locate({setView: true, maxZoom: 16});
@@ -78,7 +85,7 @@
         push(obstaclesRef, { lat: userPos.lat, lng: userPos.lng, time: Date.now() });
         pts += 100;
         document.getElementById('pts-val').innerText = pts;
-        alert("回報成功！全台騎士同步更新！");
+        alert("回報成功！雲端已同步！");
     };
 
     document.getElementById('clear-btn').onclick = () => {
