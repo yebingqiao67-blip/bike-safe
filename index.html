@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BikeSafe Omni | 專業回報版</title>
+    <title>BikeSafe Omni | 純手動回報版</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -12,22 +12,15 @@
         :root { --danger: #ff4757; --safe: #2ed573; --blue: #3498db; --warning: #f1c40f; }
         body { margin: 0; font-family: sans-serif; background: #000; overflow: hidden; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
-        
-        /* 上方 HUD */
         .hud { position: absolute; top: 10px; left: 10px; right: 10px; background: rgba(30, 39, 46, 0.95); border-radius: 15px; padding: 12px; z-index: 10; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
         .hud-main { display: flex; justify-content: space-between; align-items: center; color: white; }
         .search-box { margin-top: 10px; display: flex; gap: 5px; }
         input { flex: 1; padding: 10px; border-radius: 8px; border: none; background: #333; color: white; font-size: 16px; }
         .go-btn { background: var(--safe); color: black; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; }
-
-        /* 右側按鈕 */
         .dock { position: absolute; right: 15px; top: 180px; display: flex; flex-direction: column; gap: 15px; z-index: 10; }
         .btn { width: 60px; height: 60px; border-radius: 50%; border: none; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 28px; display: flex; align-items: center; justify-content: center; }
-
-        /* 🏆 底部積分條 */
-        .status-bar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: white; padding: 12px 25px; border-radius: 30px; z-index: 10; border: 2px solid var(--safe); white-space: nowrap; font-weight: bold; box-shadow: 0 0 20px rgba(46, 213, 115, 0.3); }
-        
-        .obstacle-icon { font-size: 30px; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        .status-bar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: white; padding: 12px 25px; border-radius: 30px; z-index: 10; border: 2px solid var(--safe); white-space: nowrap; font-weight: bold; }
+        .obstacle-icon { font-size: 30px; cursor: pointer; filter: drop-shadow(0 0 5px rgba(0,0,0,0.5)); }
         .leaflet-routing-container { display: none; }
     </style>
 </head>
@@ -39,7 +32,7 @@
         <div style="text-align: right; font-size: 0.8rem;">🌡️ 26°C | 🌬️ 順風</div>
     </div>
     <div class="search-box">
-        <input type="text" id="dest" placeholder="輸入目的地回報路況">
+        <input type="text" id="dest" placeholder="要去哪裡？">
         <button class="go-btn" onclick="planRoute()">出發</button>
     </div>
 </div>
@@ -47,6 +40,7 @@
 <div class="dock">
     <button class="btn" style="color: var(--warning);" onclick="reportObstacle()">⚠️</button>
     <button class="btn" style="color: var(--blue);" onclick="startTracking()">🚀</button>
+    <button class="btn" style="font-size: 20px; color: #666;" onclick="clearAllObstacles()">🧹</button>
 </div>
 
 <div class="status-bar" id="exp-bar">
@@ -72,38 +66,49 @@
             else userMarker = L.marker([currentLat, currentLng]).addTo(map);
             map.setView([currentLat, currentLng], 17);
         }, null, { enableHighAccuracy: true });
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance("定位成功，準備出發"));
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance("定位成功"));
     }
 
-    // ⚠️ 回報路障功能
+    // ⚠️ 回報路障（手動控制版）
     function reportObstacle() {
-        if (!userMarker) return alert("請先點擊 🚀 定位後才能回報！");
+        if (!userMarker) return alert("請先點擊 🚀 定位！");
         
-        // 在地圖上放路障
-        L.marker([currentLat, currentLng], {
+        const obs = L.marker([currentLat, currentLng], {
             icon: L.divIcon({ html: '🚧', className: 'obstacle-icon', iconSize: [30, 30] })
-        }).addTo(obstacleLayer);
+        });
+
+        // 「手動點擊」刪除功能
+        obs.on('click', function() {
+            obstacleLayer.removeLayer(obs);
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance("已移除路障標註"));
+        });
+
+        obs.addTo(obstacleLayer);
 
         // 加分獎勵
         points += 100;
         updateUI();
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance("感謝回報路障，獲得一百積分"));
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance("路障已標註"));
+    }
+
+    // 「一鍵清除」所有路障
+    function clearAllObstacles() {
+        obstacleLayer.clearLayers();
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance("所有標註已清空"));
     }
 
     async function planRoute() {
         const query = document.getElementById('dest').value;
-        if (!query) return alert("請輸入目的地");
+        if (!query) return;
         const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`);
         const data = await resp.json();
         if (data.length > 0) {
-            const dLat = data[0].lat, dLng = data[0].lon;
             if (routingControl) map.removeControl(routingControl);
             routingControl = L.Routing.control({
-                waypoints: [L.latLng(currentLat, currentLng), L.latLng(dLat, dLng)],
+                waypoints: [L.latLng(currentLat, currentLng), L.latLng(data[0].lat, data[0].lon)],
                 lineOptions: { styles: [{ color: '#3498db', weight: 6 }] },
                 createMarker: function() { return null; }
             }).addTo(map);
-            window.speechSynthesis.speak(new SpeechSynthesisUtterance("規劃完成"));
         }
     }
 
