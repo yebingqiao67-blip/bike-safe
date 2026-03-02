@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BikeSafe Omni | 專業導航版</title>
+    <title>BikeSafe Omni | 終極完全體</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -12,17 +12,26 @@
         :root { --danger: #ff4757; --safe: #2ed573; --blue: #3498db; }
         body { margin: 0; font-family: sans-serif; background: #000; overflow: hidden; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
+        
+        /* 上方 HUD */
         .hud { position: absolute; top: 10px; left: 10px; right: 10px; background: rgba(30, 39, 46, 0.95); border-radius: 15px; padding: 12px; z-index: 10; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
-        .hud-main { display: flex; justify-content: space-between; align-items: center; }
+        .hud-main { display: flex; justify-content: space-between; align-items: center; color: white; }
         .search-box { margin-top: 10px; display: flex; gap: 5px; }
         input { flex: 1; padding: 10px; border-radius: 8px; border: none; background: #333; color: white; font-size: 16px; }
         .go-btn { background: var(--safe); color: black; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; }
+
+        /* 右側按鈕 */
         .dock { position: absolute; right: 15px; top: 180px; display: flex; flex-direction: column; gap: 15px; z-index: 10; }
         .btn { width: 60px; height: 60px; border-radius: 50%; border: none; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 28px; display: flex; align-items: center; justify-content: center; }
+
+        /* 🏆 底部路障 (騎士等級) */
+        .status-bar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 30px; z-index: 10; border: 1px solid var(--safe); white-space: nowrap; }
+        
         .leaflet-routing-container { display: none; }
     </style>
 </head>
 <body>
+
 <div class="hud">
     <div class="hud-main">
         <div id="signal-ui" style="font-size: 1.5rem; font-weight: bold;">🚦 載入中</div>
@@ -33,15 +42,23 @@
         <button class="go-btn" onclick="planRoute()">出發</button>
     </div>
 </div>
+
 <div class="dock">
     <button class="btn" style="color: var(--blue);" onclick="startTracking()">🚀</button>
 </div>
+
+<div class="status-bar" id="exp-bar">
+    🏆 <span id="pts">1,250</span> Pts | 騎士等級：Lv.<span id="lv">3</span>
+</div>
+
 <div id="map"></div>
+
 <script>
     const map = L.map('map', { zoomControl: false }).setView([22.62, 120.31], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     let userMarker, routingControl;
     let currentLat = 22.62, currentLng = 120.31;
+    let points = 1250;
 
     function startTracking() {
         navigator.geolocation.watchPosition((pos) => {
@@ -51,7 +68,7 @@
             else userMarker = L.marker([currentLat, currentLng]).addTo(map);
             map.setView([currentLat, currentLng], 17);
         }, null, { enableHighAccuracy: true });
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance("系統連線成功"));
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance("系統已啟動"));
     }
 
     async function planRoute() {
@@ -71,7 +88,12 @@
         } else alert("找不到該地點");
     }
 
+    // 更新路障數值
     setInterval(() => {
+        points += 1;
+        document.getElementById('pts').innerText = points.toLocaleString();
+        document.getElementById('lv').innerText = Math.floor(points / 400);
+
         const elapsed = Math.floor(Date.now() / 1000) % 100;
         const ui = document.getElementById('signal-ui');
         if (elapsed < 60) ui.innerHTML = `<span style="color:var(--safe)">🟢 ${60-elapsed}s</span>`;
