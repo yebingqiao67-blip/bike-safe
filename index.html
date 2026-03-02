@@ -3,129 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BikeSafe Omni | 純手動回報版</title>
+    <title>單車安全守護者 - 隊長連線版</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
     <style>
-        :root { --danger: #ff4757; --safe: #2ed573; --blue: #3498db; --warning: #f1c40f; }
-        body { margin: 0; font-family: sans-serif; background: #000; overflow: hidden; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
-        .hud { position: absolute; top: 10px; left: 10px; right: 10px; background: rgba(30, 39, 46, 0.95); border-radius: 15px; padding: 12px; z-index: 10; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
-        .hud-main { display: flex; justify-content: space-between; align-items: center; color: white; }
-        .search-box { margin-top: 10px; display: flex; gap: 5px; }
-        input { flex: 1; padding: 10px; border-radius: 8px; border: none; background: #333; color: white; font-size: 16px; }
-        .go-btn { background: var(--safe); color: black; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; }
-        .dock { position: absolute; right: 15px; top: 180px; display: flex; flex-direction: column; gap: 15px; z-index: 10; }
-        .btn { width: 60px; height: 60px; border-radius: 50%; border: none; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 28px; display: flex; align-items: center; justify-content: center; }
-        .status-bar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: white; padding: 12px 25px; border-radius: 30px; z-index: 10; border: 2px solid var(--safe); white-space: nowrap; font-weight: bold; }
-        .obstacle-icon { font-size: 30px; cursor: pointer; filter: drop-shadow(0 0 5px rgba(0,0,0,0.5)); }
-        .leaflet-routing-container { display: none; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
+        #map { height: 100%; width: 100%; }
+        .menu-btn { position: absolute; right: 15px; width: 50px; height: 50px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1000; border: none; }
+        #locate-btn { bottom: 160px; }
+        #report-btn { bottom: 90px; background: #ffeb3b; }
+        #clear-btn { bottom: 20px; background: #ff5252; color: white; }
+        #pts-display { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.7); color: #00ff00; padding: 8px 15px; border-radius: 20px; z-index: 1000; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div class="hud">
-    <div class="hud-main">
-        <div id="signal-ui" style="font-size: 1.5rem; font-weight: bold;">🚦 載入中</div>
-        <div style="text-align: right; font-size: 0.8rem;">🌡️ 26°C | 🌬️ 順風</div>
-    </div>
-    <div class="search-box">
-        <input type="text" id="dest" placeholder="要去哪裡？">
-        <button class="go-btn" onclick="planRoute()">出發</button>
-    </div>
-</div>
-
-<div class="dock">
-    <button class="btn" style="color: var(--warning);" onclick="reportObstacle()">⚠️</button>
-    <button class="btn" style="color: var(--blue);" onclick="startTracking()">🚀</button>
-    <button class="btn" style="font-size: 20px; color: #666;" onclick="clearAllObstacles()">🧹</button>
-</div>
-
-<div class="status-bar" id="exp-bar">
-    🏆 <span id="pts">1,250</span> Pts | Lv.<span id="lv">3</span>
-</div>
-
+<div id="pts-display">隊長 Pts: <span id="pts-val">0</span></div>
+<button id="locate-btn" class="menu-btn">🚀</button>
+<button id="report-btn" class="menu-btn">⚠️</button>
+<button id="clear-btn" class="menu-btn">🧹</button>
 <div id="map"></div>
 
-<script>
-    const map = L.map('map', { zoomControl: false }).setView([22.62, 120.31], 15);
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, push, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // 使用隊長提供的金鑰
+    const firebaseConfig = {
+      apiKey: "AIzaSyBFqXwgDg6vFh0doCw8xcU0Sv5hYAzDSHo",
+      authDomain: "bike-safe-boss.firebaseapp.com",
+      projectId: "bike-safe-boss",
+      databaseURL: "https://bike-safe-boss-default-rtdb.firebaseio.com",
+      storageBucket: "bike-safe-boss.firebasestorage.app",
+      messagingSenderId: "804532405843",
+      appId: "1:804532405843:web:4fda6732480c61bf48e8a6"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const obstaclesRef = ref(db, 'obstacles');
+
+    const map = L.map('map').setView([22.625, 120.35], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    
-    let userMarker, routingControl;
-    let currentLat = 22.62, currentLng = 120.31;
-    let points = 1250;
-    let obstacleLayer = L.layerGroup().addTo(map);
 
-    function startTracking() {
-        navigator.geolocation.watchPosition((pos) => {
-            currentLat = pos.coords.latitude;
-            currentLng = pos.coords.longitude;
-            if (userMarker) userMarker.setLatLng([currentLat, currentLng]);
-            else userMarker = L.marker([currentLat, currentLng]).addTo(map);
-            map.setView([currentLat, currentLng], 17);
-        }, null, { enableHighAccuracy: true });
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance("定位成功"));
-    }
+    let userPos = null;
+    let pts = 0;
 
-    // ⚠️ 回報路障（手動控制版）
-    function reportObstacle() {
-        if (!userMarker) return alert("請先點擊 🚀 定位！");
-        
-        const obs = L.marker([currentLat, currentLng], {
-            icon: L.divIcon({ html: '🚧', className: 'obstacle-icon', iconSize: [30, 30] })
+    // 監聽雲端資料，實現多人同步
+    onChildAdded(obstaclesRef, (data) => {
+        const pos = data.val();
+        const marker = L.marker([pos.lat, pos.lng], {
+            icon: L.divIcon({ html: '🚧', className: 'obs-icon', iconSize: [30, 30] })
+        }).addTo(map);
+
+        // 隊長權限：點擊路障即可從雲端刪除
+        marker.on('click', () => {
+            if(confirm("隊長，要永久清除這個路障嗎？")){
+                remove(ref(db, `obstacles/${data.key}`));
+                location.reload(); 
+            }
         });
+    });
 
-        // 「手動點擊」刪除功能
-        obs.on('click', function() {
-            obstacleLayer.removeLayer(obs);
-            window.speechSynthesis.speak(new SpeechSynthesisUtterance("已移除路障標註"));
-        });
+    document.getElementById('locate-btn').onclick = () => {
+        map.locate({setView: true, maxZoom: 16});
+    };
 
-        obs.addTo(obstacleLayer);
+    map.on('locationfound', (e) => {
+        userPos = e.latlng;
+        L.circle(userPos, {radius: 10}).addTo(map);
+    });
 
-        // 加分獎勵
-        points += 100;
-        updateUI();
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance("路障已標註"));
-    }
+    document.getElementById('report-btn').onclick = () => {
+        if (!userPos) return alert("請先按 🚀 定位");
+        push(obstaclesRef, { lat: userPos.lat, lng: userPos.lng, time: Date.now() });
+        pts += 100;
+        document.getElementById('pts-val').innerText = pts;
+        alert("回報成功！全台騎士同步更新！");
+    };
 
-    // 「一鍵清除」所有路障
-    function clearAllObstacles() {
-        obstacleLayer.clearLayers();
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance("所有標註已清空"));
-    }
-
-    async function planRoute() {
-        const query = document.getElementById('dest').value;
-        if (!query) return;
-        const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`);
-        const data = await resp.json();
-        if (data.length > 0) {
-            if (routingControl) map.removeControl(routingControl);
-            routingControl = L.Routing.control({
-                waypoints: [L.latLng(currentLat, currentLng), L.latLng(data[0].lat, data[0].lon)],
-                lineOptions: { styles: [{ color: '#3498db', weight: 6 }] },
-                createMarker: function() { return null; }
-            }).addTo(map);
-        }
-    }
-
-    function updateUI() {
-        document.getElementById('pts').innerText = points.toLocaleString();
-        document.getElementById('lv').innerText = Math.floor(points / 400);
-    }
-
-    setInterval(() => {
-        points += 1;
-        updateUI();
-        const elapsed = Math.floor(Date.now() / 1000) % 100;
-        const ui = document.getElementById('signal-ui');
-        if (elapsed < 60) ui.innerHTML = `<span style="color:var(--safe)">🟢 ${60-elapsed}s</span>`;
-        else if (elapsed < 63) ui.innerHTML = `<span style="color:var(--warning)">🟡 ${63-elapsed}s</span>`;
-        else ui.innerHTML = `<span style="color:var(--danger)">🔴 ${100-elapsed}s</span>`;
-    }, 1000);
+    document.getElementById('clear-btn').onclick = () => {
+        location.reload();
+    };
 </script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>
