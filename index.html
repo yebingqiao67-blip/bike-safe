@@ -9,11 +9,23 @@
         body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; }
         #map { height: 100%; width: 100%; }
         .menu-btn { position: absolute; right: 15px; width: 50px; height: 50px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1000; border: none; }
-        #nav-btn { bottom: 230px; background: #2196F3; color: white; } /* 導航按鈕 */
+        #nav-btn { bottom: 230px; background: #2196F3; color: white; } 
         #locate-btn { bottom: 160px; }
         #report-btn { bottom: 90px; background: #ffeb3b; }
         #clear-btn { bottom: 20px; background: #ff5252; color: white; }
-        #pts-display { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.7); color: #00ff00; padding: 8px 15px; border-radius: 20px; z-index: 1000; font-weight: bold; }
+        
+        /* 這裡幫你改好了，往下移動 55px 避開左上角的 + - 按鈕 */
+        #pts-display { 
+            position: absolute; 
+            top: 55px; 
+            left: 15px; 
+            background: rgba(0,0,0,0.7); 
+            color: #00ff00; 
+            padding: 8px 15px; 
+            border-radius: 20px; 
+            z-index: 1000; 
+            font-weight: bold; 
+        }
     </style>
 </head>
 <body>
@@ -29,6 +41,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, push, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
+    // 這是你的專屬基地金鑰
     const firebaseConfig = {
       apiKey: "AIzaSyBFqXwgDg6vFh0doCw8xcU0Sv5hYAzDSHo",
       authDomain: "bike-safe-boss.firebaseapp.com",
@@ -49,6 +62,7 @@
     let userPos = null;
     let pts = 0;
 
+    // 監聽雲端資料庫
     onChildAdded(obstaclesRef, (data) => {
         const pos = data.val();
         const marker = L.marker([pos.lat, pos.lng], {
