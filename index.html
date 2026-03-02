@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BikeSafe Omni | 全能單車系統</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root { --danger: #ff4757; --safe: #2ed573; --warning: #ffa502; --blue: #3498db; }
+        body { margin: 0; font-family: sans-serif; background: #000; color: white; overflow: hidden; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
+        /* HUD 儀表板設計 */
+        .hud { position: absolute; top: 10px; left: 10px; right: 10px; background: rgba(30, 39, 46, 0.95); border-radius: 15px; padding: 15px; z-index: 10; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        .hud-main { display: flex; justify-content: space-between; align-items: center; }
+        .traffic-light { font-size: 1.8rem; font-weight: bold; font-family: monospace; }
+        /* 側邊按鈕 */
+        .dock { position: absolute; right: 15px; top: 130px; display: flex; flex-direction: column; gap: 15px; z-index: 10; }
+        .btn { width: 60px; height: 60px; border-radius: 50%; border: none; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 28px; display: flex; align-items: center; justify-content: center; }
+        /* 底部狀態 */
+        .status-bar { position: absolute; bottom: 25px; left: 15px; background: rgba(0,0,0,0.8); padding: 8px 18px; border-radius: 20px; font-size: 0.9rem; z-index: 10; border: 1px solid #333; }
+    </style>
+</head>
+<body>
+<div class="hud">
+    <div class="hud-main">
+        <div class="traffic-light" id="signal-ui">🚦 00s</div>
+        <div style="text-align: right;">
+            <div style="font-size: 1.1rem;">🌡️ 26°C</div>
+            <div style="font-size: 0.8rem; background: var(--safe); padding: 2px 8px; border-radius: 10px; margin-top:5px;">🌬️ 順風</div>
+        </div>
+    </div>
+</div>
+<div class="dock">
+    <button class="btn" style="color: var(--danger);" onclick="alert('已成功回報路障！')">⚠️</button>
+    <button class="btn" style="color: var(--blue);" onclick="startTracking()">🚀</button>
+</div>
+<div class="status-bar">🏆 1,250 Pts | 騎士等級：Lv.3</div>
+<div id="map"></div>
+<script>
+    // 初始化地圖
+    const map = L.map('map', { zoomControl: false }).setView([22.62, 120.31], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // 紅綠燈模擬器 (60秒綠, 3秒黃, 37秒紅)
+    function updateTrafficSignal() {
+        const now = Math.floor(Date.now() / 1000);
+        const elapsed = now % 100;
+        const ui = document.getElementById('signal-ui');
+        if (elapsed < 60) ui.innerHTML = `<span style="color:var(--safe)">🟢 ${60-elapsed}s</span>`;
+        else if (elapsed < 63) ui.innerHTML = `<span style="color:var(--warning)">🟡 ${63-elapsed}s</span>`;
+        else ui.innerHTML = `<span style="color:var(--danger)">🔴 ${100-elapsed}s</span>`;
+    }
+    setInterval(updateTrafficSignal, 1000);
+
+    // 啟動定位與語音
+    function startTracking() {
+        if (!navigator.geolocation) return alert("您的裝置不支援定位");
+        navigator.geolocation.watchPosition((pos) => {
+            const p = [pos.coords.latitude, pos.coords.longitude];
+            L.marker(p).addTo(map);
+            map.setView(p, 17);
+            const msg = new SpeechSynthesisUtterance("系統已啟動，祝您騎行安全");
+            window.speechSynthesis.speak(msg);
+        }, (err) => alert("請開啟 GPS 定位權限"), { enableHighAccuracy: true });
+    }
+</script>
+</body>
+</html>
