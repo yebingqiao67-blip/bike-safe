@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BikeSafe Omni | 終極完全體</title>
+    <title>BikeSafe Omni | 專業回報版</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
     <style>
-        :root { --danger: #ff4757; --safe: #2ed573; --blue: #3498db; }
+        :root { --danger: #ff4757; --safe: #2ed573; --blue: #3498db; --warning: #f1c40f; }
         body { margin: 0; font-family: sans-serif; background: #000; overflow: hidden; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; }
         
@@ -24,9 +24,10 @@
         .dock { position: absolute; right: 15px; top: 180px; display: flex; flex-direction: column; gap: 15px; z-index: 10; }
         .btn { width: 60px; height: 60px; border-radius: 50%; border: none; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 28px; display: flex; align-items: center; justify-content: center; }
 
-        /* 🏆 底部路障 (騎士等級) */
-        .status-bar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 30px; z-index: 10; border: 1px solid var(--safe); white-space: nowrap; }
+        /* 🏆 底部積分條 */
+        .status-bar { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); color: white; padding: 12px 25px; border-radius: 30px; z-index: 10; border: 2px solid var(--safe); white-space: nowrap; font-weight: bold; box-shadow: 0 0 20px rgba(46, 213, 115, 0.3); }
         
+        .obstacle-icon { font-size: 30px; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
         .leaflet-routing-container { display: none; }
     </style>
 </head>
@@ -38,17 +39,18 @@
         <div style="text-align: right; font-size: 0.8rem;">🌡️ 26°C | 🌬️ 順風</div>
     </div>
     <div class="search-box">
-        <input type="text" id="dest" placeholder="要去哪裡？(如：高雄車站)">
+        <input type="text" id="dest" placeholder="輸入目的地回報路況">
         <button class="go-btn" onclick="planRoute()">出發</button>
     </div>
 </div>
 
 <div class="dock">
+    <button class="btn" style="color: var(--warning);" onclick="reportObstacle()">⚠️</button>
     <button class="btn" style="color: var(--blue);" onclick="startTracking()">🚀</button>
 </div>
 
 <div class="status-bar" id="exp-bar">
-    🏆 <span id="pts">1,250</span> Pts | 騎士等級：Lv.<span id="lv">3</span>
+    🏆 <span id="pts">1,250</span> Pts | Lv.<span id="lv">3</span>
 </div>
 
 <div id="map"></div>
@@ -56,9 +58,11 @@
 <script>
     const map = L.map('map', { zoomControl: false }).setView([22.62, 120.31], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    
     let userMarker, routingControl;
     let currentLat = 22.62, currentLng = 120.31;
     let points = 1250;
+    let obstacleLayer = L.layerGroup().addTo(map);
 
     function startTracking() {
         navigator.geolocation.watchPosition((pos) => {
@@ -68,7 +72,22 @@
             else userMarker = L.marker([currentLat, currentLng]).addTo(map);
             map.setView([currentLat, currentLng], 17);
         }, null, { enableHighAccuracy: true });
-        window.speechSynthesis.speak(new SpeechSynthesisUtterance("系統已啟動"));
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance("定位成功，準備出發"));
+    }
+
+    // ⚠️ 回報路障功能
+    function reportObstacle() {
+        if (!userMarker) return alert("請先點擊 🚀 定位後才能回報！");
+        
+        // 在地圖上放路障
+        L.marker([currentLat, currentLng], {
+            icon: L.divIcon({ html: '🚧', className: 'obstacle-icon', iconSize: [30, 30] })
+        }).addTo(obstacleLayer);
+
+        // 加分獎勵
+        points += 100;
+        updateUI();
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance("感謝回報路障，獲得一百積分"));
     }
 
     async function planRoute() {
@@ -84,16 +103,18 @@
                 lineOptions: { styles: [{ color: '#3498db', weight: 6 }] },
                 createMarker: function() { return null; }
             }).addTo(map);
-            window.speechSynthesis.speak(new SpeechSynthesisUtterance("開始導航"));
-        } else alert("找不到該地點");
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance("規劃完成"));
+        }
     }
 
-    // 更新路障數值
-    setInterval(() => {
-        points += 1;
+    function updateUI() {
         document.getElementById('pts').innerText = points.toLocaleString();
         document.getElementById('lv').innerText = Math.floor(points / 400);
+    }
 
+    setInterval(() => {
+        points += 1;
+        updateUI();
         const elapsed = Math.floor(Date.now() / 1000) % 100;
         const ui = document.getElementById('signal-ui');
         if (elapsed < 60) ui.innerHTML = `<span style="color:var(--safe)">🟢 ${60-elapsed}s</span>`;
